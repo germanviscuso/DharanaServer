@@ -135,6 +135,7 @@ namespace CignvsLab.Editor
 
             try
             {
+                KillAutoQuitter(); 
                 Process.Start(startInfo);
                 EditorApplication.Exit(0);
             }
@@ -142,6 +143,25 @@ namespace CignvsLab.Editor
             {
                 Debug.LogError($"❌ Failed to restart Unity: {e.Message}");
             }
+        }
+
+        private static void KillAutoQuitter()
+        {
+            #if UNITY_EDITOR_OSX
+                    var processList = Process.GetProcessesByName("UnityAutoQuitter");
+                    foreach (var proc in processList)
+                    {
+                        try
+                        {
+                            proc.Kill();
+                            Debug.Log($"🛑 Killed lingering UnityAutoQuitter process (PID: {proc.Id})");
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Debug.LogWarning($"⚠️ Could not kill UnityAutoQuitter (PID: {proc.Id}): {ex.Message}");
+                        }
+                    }
+            #endif
         }
 
         private static string GetUnityEditorExecutablePath()
