@@ -3,7 +3,8 @@ using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using UnityEditor.Build;
+using System.Diagnostics; // <- for Process
+using Debug = UnityEngine.Debug;
 
 namespace CignvsLab.Editor
 {
@@ -13,7 +14,7 @@ namespace CignvsLab.Editor
         {
             { "com.endel.nativewebsocket", "https://github.com/endel/NativeWebSocket.git#upm" },
             { "jillejr.newtonsoft.json-for-unity", "https://github.com/jilleJr/Newtonsoft.Json-for-Unity.git#upm" },
-            { "org.cignvslab", "https://github.com/germanviscuso/DharanaServer.git"}
+            { "org.cignvslab", "https://github.com/germanviscuso/DharanaServer.git" }
         };
 
         [MenuItem("CignvsLab/Install")]
@@ -30,7 +31,7 @@ namespace CignvsLab.Editor
             string json = File.ReadAllText(manifestPath);
             bool changed = false;
 
-                        var match = Regex.Match(json, "\"dependencies\"\\s*:\\s*{([\\s\\S]*?)}");
+            var match = Regex.Match(json, "\"dependencies\"\\s*:\\s*{([\\s\\S]*?)}");
 
             if (match.Success)
             {
@@ -39,7 +40,6 @@ namespace CignvsLab.Editor
                 {
                     if (!dependenciesBlock.Contains($"\"{dep.Key}\""))
                     {
-                        // Add new dependency line before existing block content
                         dependenciesBlock = $"    \"{dep.Key}\": \"{dep.Value}\",\n{dependenciesBlock}";
                         Debug.Log($"📦 Added dependency: {dep.Key} → {dep.Value}");
                         changed = true;
@@ -50,7 +50,6 @@ namespace CignvsLab.Editor
                     }
                 }
 
-                // Replace the dependencies block inside the full JSON
                 json = Regex.Replace(json, "\"dependencies\"\\s*:\\s*{([\\s\\S]*?)}", $"\"dependencies\": {{\n{dependenciesBlock}\n}}");
             }
             else
@@ -63,7 +62,7 @@ namespace CignvsLab.Editor
             {
                 File.WriteAllText(manifestPath, json);
                 AssetDatabase.Refresh();
-                Debug.Log("✅ Dependencies added to manifest. Unity will reload.");
+                Debug.Log("✅ Dependencies added to manifest. Unity will now restart to apply changes.");
             }
             else
             {
@@ -71,7 +70,7 @@ namespace CignvsLab.Editor
             }
 
             TrySelfDestruct(manifestPath);
-            ForceDomainReload();
+            ForceUnityRestart();
         }
 
         private static void TrySelfDestruct(string manifestPath)
@@ -94,10 +93,7 @@ namespace CignvsLab.Editor
                 }
             }
 
-            // 🧹 Remove bootstrapper from manifest (regex-based fallback cleanup)
             string manifestJson = File.ReadAllText(manifestPath);
-
-            // Match any org.cignvslab.dependency-bootstrapper entry
             string pattern = "\\s*\"org\\.cignvslab\\.dependency-bootstrapper\"\\s*:\\s*\"[^\"]+\",?";
             string cleanedJson = Regex.Replace(manifestJson, pattern, "", RegexOptions.Multiline);
 
@@ -115,33 +111,52 @@ namespace CignvsLab.Editor
             return files.Length > 0 ? files[0] : null;
         }
 
-        // private static void ForceDomainReload()
-        // {
-        //     var buildTarget = NamedBuildTarget.FromBuildTargetGroup(EditorUserBuildSettings.selectedBuildTargetGroup);
-        //     string defines = PlayerSettings.GetScriptingDefineSymbols(buildTarget);
-        //     string magicToken = "CIGNVSLAB_FORCE_REFRESH";
-
-        //     if (!defines.Contains(magicToken))
-        //     {
-        //         PlayerSettings.SetScriptingDefineSymbols(buildTarget, $"{defines};{magicToken}");
-        //     }
-        //     else
-        //     {
-        //         PlayerSettings.SetScriptingDefineSymbols(buildTarget, defines.Replace(magicToken, ""));
-        //     }
-
-        //     Debug.Log("🔁 Triggered domain reload using NamedBuildTarget API.");
-        // }
-        private static void ForceDomainReload()
+        private static void ForceUnityRestart()
         {
-            AssetDatabase.ImportAsset("Packages/manifest.json", ImportAssetOptions.ForceUpdate);
-            Debug.Log("🔁 Forced reimport of manifest.json.");
+            string projectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string unityPath = GetUnityEditorExecutablePath();
 
-            EditorUtility.DisplayDialog(
-                "Reload Required",
-                "Dependencies were added successfully. Please restart Unity to apply all changes.",
-                "OK"
-            );
+            if (string.IsNullOrEmpty(unityPath))
+            {
+                Debug.LogWarning("⚠️ Unity executable path not found. Please restart manually.");
+                EditorUtility.DisplayDialog("Restart Required", "Dependencies installed. Please restart Unity manually.", "OK");
+                return;
+            }
+
+            EditorUtility.DisplayDialog("Restarting Unity", "Dependencies were added successfully. Unity will now restart automatically.", "OK");
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = unityPath,
+                Arguments = $"-projectPath \"{projectPath}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            try
+            {
+                Process.Start(startInfo);
+                EditorApplication.Exit(0);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"❌ Failed to restart Unity: {e.Message}");
+            }
+        }
+
+        private static string GetUnityEditorExecutablePath()
+        {
+#if UNITY_EDITOR_OSX
+            return $"/Applications/Unity/Hub/Editor/{Application.unityVersion}/Unity.app/Contents/MacOS/Unity";
+#elif UNITY_EDITOR_WIN
+            string path = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), $"Unity\\Hub\\Editor\\{Application.unityVersion}\\Editor\\Unity.exe");
+            if (File.Exists(path)) return path;
+
+            string fallback = $"C:\\Program Files\\Unity\\Hub\\Editor\\{Application.unityVersion}\\Editor\\Unity.exe";
+            return File.Exists(fallback) ? fallback : null;
+#else
+            return null;
+#endif
         }
     }
 }
