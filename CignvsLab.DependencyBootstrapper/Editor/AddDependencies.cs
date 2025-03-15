@@ -94,7 +94,7 @@ namespace CignvsLab.Editor
             {
                 File.WriteAllText(manifestPath, json);
                 AssetDatabase.Refresh();
-                Debug.Log("✅ Dependencies added to manifest. Please restart Unity.");
+                Debug.Log("✅ Dependencies added to manifest. Restart Unity if Packages are not automatically refreshed.");
             }
             else
             {
@@ -145,7 +145,7 @@ namespace CignvsLab.Editor
 
         private static void RestartWarning()
         {
-            EditorUtility.DisplayDialog("Restart Unity", "Dependencies were added successfully. Restart Unity if Packages were not refreshed.", "OK");
+            EditorUtility.DisplayDialog("Restart Unity", "Dependencies were added successfully. Restart Unity if Packages are not automatically refreshed.", "OK");
         }
     }
 }
