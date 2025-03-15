@@ -8,8 +8,40 @@ using Debug = UnityEngine.Debug;
 
 namespace CignvsLab.Editor
 {
+    [InitializeOnLoad]
     public static class AddDependencies
     {
+        static AddDependencies()
+        {
+            // This runs automatically on Editor domain reload (package import, Unity startup, etc)
+            if (!EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                ShowInstallReminderOnce();
+            }
+        }
+
+        private static void ShowInstallReminderOnce()
+        {
+            const string key = "CignvsLab.ShowedInstallReminder";
+
+            if (!SessionState.GetBool(key, false))
+            {
+                EditorApplication.update += () =>
+                {
+                    // Delay to ensure Unity finishes importing other assets
+                    if (!SessionState.GetBool(key, false))
+                    {
+                        SessionState.SetBool(key, true);
+                        EditorUtility.DisplayDialog(
+                            "Install Dependencies",
+                            "The CignvsLab package was imported.\nGo to CignvsLab > Install to set up required dependencies.",
+                            "OK"
+                        );
+                    }
+                };
+            }
+        }
+
         private static readonly Dictionary<string, string> dependenciesToAdd = new Dictionary<string, string>
         {
             { "com.endel.nativewebsocket", "https://github.com/endel/NativeWebSocket.git#upm" },
@@ -71,7 +103,7 @@ namespace CignvsLab.Editor
 
             TrySelfDestruct(manifestPath);
             RestartWarning();
-            //ForceUnityRestart();
+            // ForceUnityRestart(); ← only if you want automatic restart
         }
 
         private static void TrySelfDestruct(string manifestPath)
@@ -85,7 +117,6 @@ namespace CignvsLab.Editor
                     File.Delete(scriptPath);
                     string metaPath = scriptPath + ".meta";
                     if (File.Exists(metaPath)) File.Delete(metaPath);
-
                     Debug.Log("🧹 Self-cleanup complete: Removed AddDependencies.cs after successful run.");
                 }
                 catch (IOException e)
@@ -115,54 +146,6 @@ namespace CignvsLab.Editor
         private static void RestartWarning()
         {
             EditorUtility.DisplayDialog("Restart Unity", "Dependencies were added successfully. Restart Unity if Packages were not refreshed.", "OK");
-        }
-
-        private static void ForceUnityRestart()
-        {
-            string projectPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string unityPath = GetUnityEditorExecutablePath();
-
-            if (string.IsNullOrEmpty(unityPath))
-            {
-                Debug.LogWarning("⚠️ Unity executable path not found. Please restart manually.");
-                EditorUtility.DisplayDialog("Restart Required", "Dependencies installed. Please restart Unity manually.", "OK");
-                return;
-            }
-
-            EditorUtility.DisplayDialog("Restarting Unity", "Dependencies were added successfully. Unity will now restart automatically.", "OK");
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = unityPath,
-                Arguments = $"-projectPath \"{projectPath}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            try
-            {
-                Process.Start(startInfo);
-                EditorApplication.Exit(0);
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"❌ Failed to restart Unity: {e.Message}");
-            }
-        }
-
-        private static string GetUnityEditorExecutablePath()
-        {
-#if UNITY_EDITOR_OSX
-            return $"/Applications/Unity/Hub/Editor/{Application.unityVersion}/Unity.app/Contents/MacOS/Unity";
-#elif UNITY_EDITOR_WIN
-            string path = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles), $"Unity\\Hub\\Editor\\{Application.unityVersion}\\Editor\\Unity.exe");
-            if (File.Exists(path)) return path;
-
-            string fallback = $"C:\\Program Files\\Unity\\Hub\\Editor\\{Application.unityVersion}\\Editor\\Unity.exe";
-            return File.Exists(fallback) ? fallback : null;
-#else
-            return null;
-#endif
         }
     }
 }
