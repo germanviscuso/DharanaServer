@@ -70,6 +70,7 @@ namespace CignvsLab.Editor
             }
 
             TrySelfDestruct(manifestPath);
+            RestartWarning();
             //ForceUnityRestart();
         }
 
@@ -109,6 +110,11 @@ namespace CignvsLab.Editor
         {
             string[] files = Directory.GetFiles(Application.dataPath, "AddDependencies.cs", SearchOption.AllDirectories);
             return files.Length > 0 ? files[0] : null;
+        }
+
+        private static void RestartWarning()
+        {
+            EditorUtility.DisplayDialog("Restart Unity", "Dependencies were added successfully. Restart Unity if Packages were not refreshed.", "OK");
         }
 
         private static void ForceUnityRestart()
