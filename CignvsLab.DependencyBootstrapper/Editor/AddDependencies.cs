@@ -94,7 +94,7 @@ namespace CignvsLab.Editor
             {
                 File.WriteAllText(manifestPath, json);
                 AssetDatabase.Refresh();
-                Debug.Log("✅ Dependencies added to manifest. Please restart Unity if Packages are not refreshed.");
+                Debug.Log("✅ Dependencies added to manifest. Please restart Unity.");
             }
             else
             {
@@ -103,7 +103,7 @@ namespace CignvsLab.Editor
 
             TrySelfDestruct(manifestPath);
             RestartWarning();
-            // ForceUnityRestart(); ← only if you want automatic restart
+            // ForceUnityRestart();
         }
 
         private static void TrySelfDestruct(string manifestPath)
